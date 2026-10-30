@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pomodoro Focus Timer & Google Sheet Sync</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .preset-btn.active {
+            background-color: #4f46e5;
+            color: #ffffff;
+            border-color: #4f46e5;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+        }
+        .progress-ring__circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 text-slate-800 dark:text-slate-100 min-h-full flex flex-col justify-between antialiased">
+
+    <!-- Toast Notification Overlay -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-x-full transition-transform duration-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-2xl p-4 flex items-center space-x-3 max-w-sm pointer-events-none">
+        <div id="toastIcon" class="text-2xl">✨</div>
+        <div>
+            <h4 id="toastTitle" class="font-semibold text-sm text-slate-800 dark:text-slate-100">Thông báo</h4>
+            <p id="toastDesc" class="text-xs text-slate-500 dark:text-slate-400"></p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
+        
+        <!-- Header -->
+        <header class="flex justify-between items-center mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60">
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl">🍅</span>
+                <div>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">FocusFlow Timer</h1>
+                    <p class="text-xs text-slate-400">Tập trung làm việc & Tự động ghi Sheet</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button onclick="openSettingsModal()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition flex items-center gap-1.5" title="Cấu hình Google Sheet">
+                    <span>⚙️</span>
+                    <span>Cấu hình Sheet</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Timer Card -->
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/60 dark:border-slate-700/60 text-center relative overflow-hidden">
+            
+            <!-- Task Name Input -->
+            <div class="mb-5 max-w-md mx-auto">
+                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 text-left mb-1.5 ml-1">Mục tiêu hiện tại:</label>
+                <input type="text" id="taskNameInput" placeholder="Ví dụ: Đọc tài liệu, Viết code, Soạn email..." class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-medium placeholder-slate-400 transition text-sm sm:text-base">
+            </div>
+
+            <!-- Time Customization: Input & Presets -->
+            <div class="mb-6 max-w-md mx-auto bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-700/70">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nhập số phút:</span>
+                    <div class="flex items-center gap-2">
+                        <input type="number" id="customMinutesInput" min="1" max="360" value="25" onchange="onCustomMinutesChange(this.value)" class="w-20 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <span class="text-xs text-slate-400">phút</span>
+                    </div>
+                </div>
+
+                <!-- Quick Presets Row: 10, 15, 20, 30, 60 -->
+                <div class="flex items-center justify-between gap-1.5 sm:gap-2">
+                    <button type="button" onclick="selectPreset(10)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="10">10m</button>
+                    <button type="button" onclick="selectPreset(15)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="15">15m</button>
+                    <button type="button" onclick="selectPreset(20)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="20">20m</button>
+                    <button type="button" onclick="selectPreset(25)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition active" data-minutes="25">25m</button>
+                    <button type="button" onclick="selectPreset(30)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="30">30m</button>
+                    <button type="button" onclick="selectPreset(60)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="60">60m</button>
+                </div>
+            </div>
+
+            <!-- Circular Progress Ring Display -->
+            <div class="relative w-64 h-64 mx-auto my-2 flex items-center justify-center">
+                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 220 220">
+                    <circle cx="110" cy="110" r="95" stroke-width="10" stroke="currentColor" fill="transparent" class="text-slate-100 dark:text-slate-700/60" />
+                    <circle id="progressCircle" cx="110" cy="110" r="95" stroke-width="10" stroke="url(#progressGradient)" fill="transparent" stroke-linecap="round" stroke-dasharray="596.9" stroke-dashoffset="0" class="transition-all duration-500" />
+                    <defs>
+                        <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#6366f1" />
+                            <stop offset="100%" stop-color="#a855f7" />
+                        </linearGradient>
+                    </defs>
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span id="timerDisplay" class="text-5xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white font-mono">25:00</span>
+                    <span id="statusLabel" class="text-xs uppercase font-bold tracking-widest text-slate-400 mt-1">Sẵn sàng</span>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+        <div class="flex justify-center items-center space-x-4 mt-6">
+            <button id="startPauseBtn" onclick="toggleTimer()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2">
+                <span id="startPauseIcon">▶</span>
+                <span id="startPauseText">Bắt đầu</span>
+            </button>
+            <button onclick="resetTimer()" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold px-6 py-3.5 rounded-2xl transition transform active:scale-95">
+                Đặt lại
+            </button>
+        </div>
+    </div>
+
+    <!-- Alarm Ringing Overlay / Modal (Full-screen Alert) -->
+    <div id="alarmModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-2 border-rose-500 animate-bounce">
+            <div class="w-20 h-20 mx-auto mb-4 bg-rose-100 dark:bg-rose-950/60 text-rose-600 rounded-full flex items-center justify-center text-4xl animate-pulse">
+                🔔
+            </div>
+            <h2 class="text-2xl font-black text-rose-600 dark:text-rose-400 mb-2">HẾT GIỜ TẬP TRUNG!</h2>
+            <p id="alarmTaskText" class="text-sm font-medium text-slate-600 dark:text-slate-300 mb-6">Bạn đã hoàn thành phiên làm việc.</p>
+            <button onclick="stopAlarm()" class="w-full py-4 px-6 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-rose-500/40 transition transform active:scale-95 flex items-center justify-center gap-2">
+                <span>🔕</span>
+                <span>TẮT CHUÔNG NGAY</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- History & Status Section -->
+    <div class="mt-8 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200/60 dark:border-slate-700/60">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2">
+                    <span>📊 Nhật ký các phiên hoàn thành</span>
+                </h3>
+                <button onclick="clearHistory()" class="text-xs text-rose-500 hover:underline">Xóa lịch sử</button>
+            </div>
+            <div id="historyList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <p class="text-slate-400 text-sm text-center py-4">Chưa có phiên làm việc nào được hoàn thành.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer info -->
+    <footer class="text-center py-4 text-xs text-slate-400">
+        Pomodoro Web App tích hợp Google Sheet Webhook & Web Audio API
+    </footer>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-bold">Cài đặt ứng dụng</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold text-xl">&times;</button>
+            </div>
+            
+            <!-- Sound Selection -->
+            <div class="mb-5 pb-5 border-b border-slate-100 dark:border-slate-700">
+                <label class="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">🔔 Chuông thông báo khi hoàn thành:</label>
+                <div class="flex items-center gap-2">
+                    <select id="soundSelect" class="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 dark:text-slate-200">
+                        <option value="chime">✨ Chuông trong trẻo (Crystal Chime)</option>
+                        <option value="zen">🧘 Chuông thiền tĩnh tâm (Zen Gong)</option>
+                        <option value="marimba">🎶 Marimba vui tươi (Cheerful Arpeggio)</option>
+                        <option value="arcade">👾 Bíp điện tử Retro 8-bit (Digital Arcade)</option>
+                        <option value="ping">💧 Chuông Ping nhẹ nhàng (Soft Ping)</option>
+                    </select>
+                    <button type="button" onclick="previewSelectedSound()" class="px-3 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0" title="Nghe thử chuông">
+                        <span>🔊</span>
+                        <span>Nghe thử</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Google Sheet Webhook Config -->
+            <div class="mb-4">
+                <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">📊 Google Apps Script Webhook URL:</label>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+                    Dán URL Web App đã triển khai từ Google Apps Script (Execute as: <b>Me</b>, Who has access: <b>Anyone</b>) để tự động xuất dữ liệu.
+                </p>
+                <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl hover:bg-slate-200 transition">Hủy</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition">Lưu cài đặt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        // State Variables
+        let timerInterval = null;
+        let alarmInterval = null;
+        let activeTaskDurationMinutes = 25;
+        let totalSeconds = 25 * 60;
+        let initialSeconds = 25 * 60;
+        let isRunning = false;
+        let selectedSoundType = 'chime';
+
+        const CIRCUMFERENCE = 2 * Math.PI * 95; // r=95 => ~596.9
+
+        // DOM Elements
+        const timerDisplay = document.getElementById('timerDisplay');
+        const statusLabel = document.getElementById('statusLabel');
+        const startPauseBtn = document.getElementById('startPauseBtn');
+        const startPauseIcon = document.getElementById('startPauseIcon');
+        const startPauseText = document.getElementById('startPauseText');
+        const progressCircle = document.getElementById('progressCircle');
+        const taskNameInput = document.getElementById('taskNameInput');
+        const customMinutesInput = document.getElementById('customMinutesInput');
+        const historyList = document.getElementById('historyList');
+        const settingsModal = document.getElementById('settingsModal');
+        const scriptUrlInput = document.getElementById('scriptUrlInput');
+        const soundSelect = document.getElementById('soundSelect');
+        const alarmModal = document.getElementById('alarmModal');
+        const alarmTaskText = document.getElementById('alarmTaskText');
+
+        // Setup Progress Circle Circumference
+        progressCircle.style.strokeDasharray = `${CIRCUMFERENCE}`;
+        progressCircle.style.strokeDashoffset = '0';
+
+        document.addEventListener("DOMContentLoaded", () => {
+            if ("Notification" in window && Notification.permission !== "granted") {
+                Notification.requestPermission();
+            }
+            const savedUrl = localStorage.getItem('google_script_url') || '';
+            scriptUrlInput.value = savedUrl;
+
+            selectedSoundType = localStorage.getItem('focus_sound_type') || 'chime';
+            soundSelect.value = selectedSoundType;
+
+            loadHistory();
+            updateDisplay();
+        });
+
+        // Preset Button Selection
+        function selectPreset(minutes) {
+            minutes = parseInt(minutes);
+            if (isNaN(minutes) || minutes <= 0) return;
+
+            customMinutesInput.value = minutes;
+            applyDuration(minutes);
+            updatePresetHighlight(minutes);
+        }
+
+        // Custom Minutes Input Changed
+        function onCustomMinutesChange(value) {
+            let mins = parseInt(value);
+            if (isNaN(mins) || mins < 1) mins = 1;
+            if (mins > 360) mins = 360;
+            customMinutesInput.value = mins;
+            applyDuration(mins);
+            updatePresetHighlight(mins);
+        }
+
+        function updatePresetHighlight(minutes) {
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                const btnMins = parseInt(btn.getAttribute('data-minutes'));
+                if (btnMins === minutes) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+        }
+
+        function applyDuration(minutes) {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                updatePlayButtonState();
+            }
+            activeTaskDurationMinutes = minutes;
+            totalSeconds = minutes * 60;
+            initialSeconds = totalSeconds;
+            statusLabel.innerText = "Sẵn sàng";
+            updateDisplay();
+        }
+
+        // Timer Controls
+        function toggleTimer() {
+            if (isRunning) {
+                clearInterval(timerInterval);
+                isRunning = false;
+                statusLabel.innerText = "Đã tạm dừng";
+                updatePlayButtonState();
+            } else {
+                isRunning = true;
+                statusLabel.innerText = "Đang tập trung";
+                updatePlayButtonState();
+                timerInterval = setInterval(() => {
+                    if (totalSeconds > 0) {
+                        totalSeconds--;
+                        updateDisplay();
+                    } else {
+                        clearInterval(timerInterval);
+                        isRunning = false;
+                        statusLabel.innerText = "Hoàn thành";
+                        updatePlayButtonState();
+                        handleTimerComplete();
+                    }
+                }, 1000);
+            }
+        }
+
+        function resetTimer() {
+            stopAlarm();
+            clearInterval(timerInterval);
+            isRunning = false;
+            statusLabel.innerText = "Sẵn sàng";
+            updatePlayButtonState();
+            totalSeconds = initialSeconds;
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            const timeString = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            timerDisplay.innerText = timeString;
+            document.title = `(${timeString}) FocusFlow Timer`;
+
+            // Circular progress calculation
+            const progressRatio = totalSeconds / initialSeconds;
+            const offset = CIRCUMFERENCE * (1 - progressRatio);
+            progressCircle.style.strokeDashoffset = offset;
+        }
+
+        function updatePlayButtonState() {
+            if (isRunning) {
+                startPauseIcon.innerText = "⏸";
+                startPauseText.innerText = "Tạm dừng";
+                startPauseBtn.className = "bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-amber-500/30 transition transform active:scale-95 flex items-center space-x-2";
+            } else {
+                startPauseIcon.innerText = "▶";
+                startPauseText.innerText = "Bắt đầu";
+                startPauseBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2";
+            }
+        }
+
+        // Timer Completion Event
+        function handleTimerComplete() {
+            const taskName = taskNameInput.value.trim() || "Phiên tập trung";
+            
+            // Notification API
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("Hết giờ!", {
+                    body: `Bạn đã hoàn thành: ${taskName} (${activeTaskDurationMinutes} phút)`,
+                    icon: "https://cdn-icons-png.flaticon.com/512/2921/2921222.png",
+                    requireInteraction: true
+                });
+            }
+
+            showToast("🎉 Hoàn thành!", `Đã kết thúc phiên: ${taskName} (${activeTaskDurationMinutes} phút)`);
+            saveHistoryEntry(taskName, activeTaskDurationMinutes);
+
+            const scriptUrl = localStorage.getItem('google_script_url');
+            if (scriptUrl) {
+                syncToGoogleSheet(scriptUrl, taskName, activeTaskDurationMinutes);
+            }
+
+            // Kích hoạt chuông liên tục và hiển thị màn hình tắt chuông
+            startContinuousAlarm(taskName);
+        }
+
+        // Continuous Alarm Loop
+        function startContinuousAlarm(taskName) {
+            stopAlarm(); // Đảm bảo không bị lặp đè
+            alarmTaskText.innerText = `Đã hoàn thành: "${taskName}" (${activeTaskDurationMinutes} phút)`;
+            alarmModal.classList.remove('hidden');
+
+            // Phát ngay lần đầu tiên
+            playSound(selectedSoundType);
+
+            // Xác định chu kỳ lặp lại tùy theo loại chuông
+            const loopDelay = selectedSoundType === 'zen' ? 3500 : 2000;
+            alarmInterval = setInterval(() => {
+                playSound(selectedSoundType);
+            }, loopDelay);
+        }
+
+        function stopAlarm() {
+            if (alarmInterval) {
+                clearInterval(alarmInterval);
+                alarmInterval = null;
+            }
+            alarmModal.classList.add('hidden');
+        }
+
+        // Web Audio API Sound Synthesizers
+        function playSound(type) {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+
+                const now = audioCtx.currentTime;
+
+                if (type === 'zen') {
+                    // Deep Zen Singing Bowl / Gong sound
+                    const osc = audioCtx.createOscillator();
+                    const subOsc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(216, now); // 216Hz A
+                    subOsc.type = 'sine';
+                    subOsc.frequency.setValueAtTime(432, now); // Harmonic
+
+                    gain.gain.setValueAtTime(0.5, now);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
+
+                    osc.connect(gain);
+                    subOsc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start(now);
+                    subOsc.start(now);
+                    osc.stop(now + 3.2);
+                    subOsc.stop(now + 3.2);
+
+                } else if (type === 'marimba') {
+                    // Cheerful fast arpeggio
+                    const freqs = [392.00, 523.25, 659.25, 783.99, 1046.50]; // G4, C5, E5, G5, C6
+                    freqs.forEach((freq, idx) => {
+                        const noteStart = now + idx * 0.12;
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, noteStart);
+
+                        gain.gain.setValueAtTime(0.35, noteStart);
+                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.45);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+
+                        osc.start(noteStart);
+                        osc.stop(noteStart + 0.45);
+                    });
+
+                } else if (type === 'arcade') {
+                    // 8-bit digital arcade victory fan-fare
+                    const notes = [440, 554.37, 659.25, 880];
+                    notes.forEach((freq, idx) => {
+                        const noteStart = now + idx * 0.08;
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'square';
+                        osc.frequency.setValueAtTime(freq, noteStart);
+
+                        gain.gain.setValueAtTime(0.2, noteStart);
+                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.12);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+
+                        osc.start(noteStart);
+                        osc.stop(noteStart + 0.12);
+                    });
+
+                } else if (type === 'ping') {
+                    // Single gentle high soft ping
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1318.51, now); // E6
+                    gain.gain.setValueAtTime(0.3, now);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 1.2);
+
+                } else {
+                    // Default: Crystal Chime
+                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                    notes.forEach((freq, index) => {
+                        const noteStart = now + index * 0.18;
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, noteStart);
+
+                        gain.gain.setValueAtTime(0.3, noteStart);
+                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 1.2);
+
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
+
+                        osc.start(noteStart);
+                        osc.stop(noteStart + 1.2);
+                    });
+                }
+            } catch (e) {
+                console.log("Audio Context error or not permitted:", e);
+            }
+        }
+
+        function previewSelectedSound() {
+            const currentSound = soundSelect.value;
+            playSound(currentSound);
+        }
+
+        // Webhook to Google Sheet
+        function syncToGoogleSheet(url, task, duration) {
+            const payload = {
+                task: task,
+                duration: duration
+            };
+
+            fetch(url, {
+                method: "POST",
+                mode: "no-cors",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload)
+            }).then(() => {
+                showToast("☁️ Đã đồng bộ", "Dữ liệu phiên làm việc đã được lưu vào Google Sheet!");
+            }).catch(error => {
+                console.error("Lỗi đồng bộ:", error);
+                showToast("⚠️ Lỗi đồng bộ", "Không thể gửi dữ liệu tới Google Sheet Webhook.");
+            });
+        }
+
+        // LocalStorage History
+        function saveHistoryEntry(task, duration) {
+            const history = JSON.parse(localStorage.getItem('focus_history') || '[]');
+            const newEntry = {
+                task: task,
+                duration: duration,
+                time: new Date().toLocaleString('vi-VN')
+            };
+            history.unshift(newEntry);
+            if (history.length > 30) history.pop();
+            localStorage.setItem('focus_history', JSON.stringify(history));
+            loadHistory();
+        }
+
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('focus_history') || '[]');
+            if (history.length === 0) {
+                historyList.innerHTML = `<p class="text-slate-400 text-sm text-center py-4">Chưa có phiên làm việc nào được hoàn thành.</p>`;
+                return;
+            }
+
+            historyList.innerHTML = history.map(item => `
+                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 text-sm">
+                    <div>
+                        <span class="font-semibold text-slate-700 dark:text-slate-200">${escapeHtml(item.task)}</span>
+                        <span class="block text-xs text-slate-400">${item.time}</span>
+                    </div>
+                    <span class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold">${item.duration} phút</span>
+                </div>
+            `).join('');
+        }
+
+        function clearHistory() {
+            localStorage.removeItem('focus_history');
+            loadHistory();
+            showToast("🗑️ Đã xóa", "Lịch sử đã được làm sạch.");
+        }
+
+        // Settings Modal
+        function openSettingsModal() {
+            soundSelect.value = selectedSoundType;
+            settingsModal.classList.remove('hidden');
+        }
+
+        function closeSettingsModal() {
+            settingsModal.classList.add('hidden');
+        }
+
+        function saveSettings() {
+            const url = scriptUrlInput.value.trim();
+            selectedSoundType = soundSelect.value;
+
+            localStorage.setItem('google_script_url', url);
+            localStorage.setItem('focus_sound_type', selectedSoundType);
+
+            closeSettingsModal();
+            showToast("💾 Đã lưu", "Cài đặt chuông và kết nối Sheet đã được cập nhật.");
+        }
+
+        // Toast Helper
+        function showToast(title, desc) {
+            document.getElementById('toastTitle').innerText = title;
+            document.getElementById('toastDesc').innerText = desc;
+            const toast = document.getElementById('toast');
+            toast.classList.remove('translate-x-full');
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+            }, 3500);
+        }
+
+        function escapeHtml(text) {
+            const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+            return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+        }
+    </script>
+</body>
+</html>
