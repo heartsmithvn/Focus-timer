@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pomodoro Focus Timer & Google Sheet Sync</title>
-    <!-- Tailwind CSS for modern styling -->
+    <title>FocusFlow Timer - Pomodoro & Google Sheet Sync</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -14,92 +14,117 @@
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
+                    keyframes: {
+                        pulseRing: {
+                            '0%, 100%': { transform: 'scale(1)', opacity: '1' },
+                            '50%': { transform: 'scale(1.04)', opacity: '0.85' },
+                        }
+                    },
+                    animation: {
+                        'pulse-ring': 'pulseRing 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
                 }
             }
         }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
         .preset-btn.active {
             background-color: #4f46e5;
             color: #ffffff;
             border-color: #4f46e5;
-            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.35);
         }
         .progress-ring__circle {
-            transition: stroke-dashoffset 0.35s;
+            transition: stroke-dashoffset 0.4s ease-out;
             transform: rotate(-90deg);
             transform-origin: 50% 50%;
         }
+        /* Custom scrollbar for history */
+        #historyList::-webkit-scrollbar {
+            width: 6px;
+        }
+        #historyList::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.4);
+            border-radius: 9999px;
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 text-slate-800 dark:text-slate-100 min-h-full flex flex-col justify-between antialiased">
+<body class="bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950/60 text-slate-800 dark:text-slate-100 min-h-full flex flex-col justify-between antialiased transition-colors duration-200">
 
-    <!-- Toast Notification Overlay -->
-    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-x-full transition-transform duration-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl rounded-2xl p-4 flex items-center space-x-3 max-w-sm pointer-events-none">
-        <div id="toastIcon" class="text-2xl">✨</div>
-        <div>
-            <h4 id="toastTitle" class="font-semibold text-sm text-slate-800 dark:text-slate-100">Thông báo</h4>
-            <p id="toastDesc" class="text-xs text-slate-500 dark:text-slate-400"></p>
+    <!-- Toast Notification Banner -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-x-full transition-all duration-300 ease-in-out bg-white/95 dark:bg-slate-800/95 backdrop-blur-md border border-slate-200 dark:border-slate-700 shadow-2xl rounded-2xl p-4 flex items-center space-x-3.5 max-w-sm pointer-events-none">
+        <div id="toastIcon" class="text-2xl shrink-0">✨</div>
+        <div class="overflow-hidden">
+            <h4 id="toastTitle" class="font-bold text-sm text-slate-800 dark:text-slate-100 truncate">Thông báo</h4>
+            <p id="toastDesc" class="text-xs text-slate-500 dark:text-slate-400 break-words"></p>
         </div>
     </div>
 
     <!-- Main Container -->
-    <div class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
+    <main class="max-w-2xl w-full mx-auto p-4 sm:p-6 my-auto">
         
         <!-- Header -->
-        <header class="flex justify-between items-center mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60">
-            <div class="flex items-center space-x-2">
-                <span class="text-2xl">🍅</span>
+        <header class="flex justify-between items-center mb-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-md p-4 sm:px-6 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-700/60">
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl filter drop-shadow">🍅</span>
                 <div>
-                    <h1 class="text-lg font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">FocusFlow Timer</h1>
-                    <p class="text-xs text-slate-400">Tập trung làm việc & Tự động ghi Sheet</p>
+                    <h1 class="text-lg sm:text-xl font-extrabold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent">FocusFlow Timer</h1>
+                    <p class="text-xs text-slate-400 dark:text-slate-500">Tập trung tối đa & Tự động đồng bộ Google Sheets</p>
                 </div>
             </div>
             <div class="flex items-center space-x-2">
-                <button onclick="openSettingsModal()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition flex items-center gap-1.5" title="Cấu hình Google Sheet">
+                <!-- Nút phát 1 tiếng chuông thông báo ngay trên header -->
+                <button onclick="playSingleNotificationSound()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition flex items-center gap-1.5 shadow-sm active:scale-95" title="Phát ngay 1 tiếng chuông thông báo">
+                    <span class="animate-bounce">🔔</span>
+                    <span class="hidden sm:inline">Phát tiếng chuông</span>
+                </button>
+                <button onclick="toggleDarkMode()" class="p-2.5 rounded-xl text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700 transition" title="Đổi giao diện sáng/tối">
+                    <span id="themeIcon">🌓</span>
+                </button>
+                <button onclick="openSettingsModal()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition flex items-center gap-1.5 shadow-sm" title="Cấu hình Google Sheet & Chuông">
                     <span>⚙️</span>
-                    <span>Cấu hình Sheet</span>
+                    <span class="hidden sm:inline">Cài đặt</span>
                 </button>
             </div>
         </header>
 
         <!-- Timer Card -->
-        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/60 dark:border-slate-700/60 text-center relative overflow-hidden">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-200/60 dark:border-slate-700/60 text-center relative overflow-hidden backdrop-blur-sm">
             
-            <!-- Task Name Input -->
+            <!-- Task Input -->
             <div class="mb-5 max-w-md mx-auto">
-                <label class="block text-xs font-medium text-slate-500 dark:text-slate-400 text-left mb-1.5 ml-1">Mục tiêu hiện tại:</label>
-                <input type="text" id="taskNameInput" placeholder="Ví dụ: Đọc tài liệu, Viết code, Soạn email..." class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-medium placeholder-slate-400 transition text-sm sm:text-base">
+                <label for="taskNameInput" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 text-left mb-1.5 ml-1">Mục tiêu / Tác vụ hiện tại:</label>
+                <input type="text" id="taskNameInput" placeholder="Ví dụ: Lập trình giao diện, Đọc 20 trang sách..." class="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-center font-medium placeholder-slate-400 text-slate-800 dark:text-slate-100 transition text-sm sm:text-base shadow-inner">
             </div>
 
-            <!-- Time Customization: Input & Presets -->
-            <div class="mb-6 max-w-md mx-auto bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-700/70">
+            <!-- Time Preset Controls -->
+            <div class="mb-6 max-w-md mx-auto bg-slate-50/80 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-200/70 dark:border-slate-700/70">
                 <div class="flex items-center justify-between gap-3 mb-3">
-                    <span class="text-xs font-semibold text-slate-600 dark:text-slate-300">Nhập số phút:</span>
+                    <span class="text-xs font-bold text-slate-600 dark:text-slate-300">Tùy chỉnh số phút:</span>
                     <div class="flex items-center gap-2">
-                        <input type="number" id="customMinutesInput" min="1" max="360" value="25" onchange="onCustomMinutesChange(this.value)" class="w-20 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                        <span class="text-xs text-slate-400">phút</span>
+                        <input type="number" id="customMinutesInput" min="1" max="360" value="25" onchange="onCustomMinutesChange(this.value)" class="w-20 px-3 py-1.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-center font-bold text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-100">
+                        <span class="text-xs text-slate-400 font-medium">phút</span>
                     </div>
                 </div>
 
-                <!-- Quick Presets Row: 10, 15, 20, 30, 60 -->
-                <div class="flex items-center justify-between gap-1.5 sm:gap-2">
-                    <button type="button" onclick="selectPreset(10)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="10">10m</button>
-                    <button type="button" onclick="selectPreset(15)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="15">15m</button>
-                    <button type="button" onclick="selectPreset(20)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="20">20m</button>
-                    <button type="button" onclick="selectPreset(25)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition active" data-minutes="25">25m</button>
-                    <button type="button" onclick="selectPreset(30)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="30">30m</button>
-                    <button type="button" onclick="selectPreset(60)" class="preset-btn flex-1 py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="60">60m</button>
+                <!-- Quick Presets -->
+                <div class="grid grid-cols-6 gap-1.5 sm:gap-2">
+                    <button type="button" onclick="selectPreset(10)" class="preset-btn py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="10">10m</button>
+                    <button type="button" onclick="selectPreset(15)" class="preset-btn py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="15">15m</button>
+                    <button type="button" onclick="selectPreset(20)" class="preset-btn py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="20">20m</button>
+                    <button type="button" onclick="selectPreset(25)" class="preset-btn active py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="25">25m</button>
+                    <button type="button" onclick="selectPreset(30)" class="preset-btn py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="30">30m</button>
+                    <button type="button" onclick="selectPreset(60)" class="preset-btn py-1.5 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-500 transition" data-minutes="60">60m</button>
                 </div>
             </div>
 
             <!-- Circular Progress Ring Display -->
-            <div class="relative w-64 h-64 mx-auto my-2 flex items-center justify-center">
+            <div id="ringWrapper" class="relative w-64 h-64 mx-auto my-2 flex items-center justify-center">
                 <svg class="w-full h-full transform -rotate-90" viewBox="0 0 220 220">
-                    <circle cx="110" cy="110" r="95" stroke-width="10" stroke="currentColor" fill="transparent" class="text-slate-100 dark:text-slate-700/60" />
-                    <circle id="progressCircle" cx="110" cy="110" r="95" stroke-width="10" stroke="url(#progressGradient)" fill="transparent" stroke-linecap="round" stroke-dasharray="596.9" stroke-dashoffset="0" class="transition-all duration-500" />
+                    <circle cx="110" cy="110" r="95" stroke-width="10" stroke="currentColor" fill="transparent" class="text-slate-100 dark:text-slate-700/50" />
+                    <circle id="progressCircle" cx="110" cy="110" r="95" stroke-width="10" stroke="url(#progressGradient)" fill="transparent" stroke-linecap="round" stroke-dasharray="596.9" stroke-dashoffset="0" class="progress-ring__circle" />
                     <defs>
                         <linearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                             <stop offset="0%" stop-color="#6366f1" />
@@ -107,32 +132,131 @@
                         </linearGradient>
                     </defs>
                 </svg>
-                <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <span id="timerDisplay" class="text-5xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white font-mono">25:00</span>
-                    <span id="statusLabel" class="text-xs uppercase font-bold tracking-widest text-slate-400 mt-1">Sẵn sàng</span>
+                <div class="absolute inset-0 flex flex-col items-center justify-center select-none pointer-events-none">
+                    <span id="timerDisplay" class="text-5xl sm:text-6xl font-black tracking-tight text-slate-900 dark:text-white font-mono drop-shadow-sm">25:00</span>
+                    <span id="statusLabel" class="text-xs uppercase font-extrabold tracking-widest text-slate-400 dark:text-slate-500 mt-2 px-3 py-1 rounded-full bg-slate-100/80 dark:bg-slate-700/60 border border-slate-200/50 dark:border-slate-600/50">Sẵn sàng</span>
                 </div>
             </div>
 
             <!-- Control Buttons -->
-        <div class="flex justify-center items-center space-x-4 mt-6">
-            <button id="startPauseBtn" onclick="toggleTimer()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2">
-                <span id="startPauseIcon">▶</span>
-                <span id="startPauseText">Bắt đầu</span>
-            </button>
-            <button onclick="resetTimer()" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold px-6 py-3.5 rounded-2xl transition transform active:scale-95">
-                Đặt lại
-            </button>
-        </div>
-    </div>
+            <div class="flex justify-center items-center space-x-4 mt-6">
+                <button id="startPauseBtn" onclick="toggleTimer()" class="bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2">
+                    <span id="startPauseIcon">▶</span>
+                    <span id="startPauseText">Bắt đầu</span>
+                </button>
+                <button onclick="resetTimer()" class="bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold px-6 py-3.5 rounded-2xl transition transform active:scale-95 shadow-sm">
+                    Đặt lại
+                </button>
+            </div>
 
-    <!-- Alarm Ringing Overlay / Modal (Full-screen Alert) -->
+            <!-- Single Notification Sound Button Section -->
+            <div class="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700/60 max-w-md mx-auto">
+                <button id="triggerSoundBtn" onclick="playSingleNotificationSound()" class="w-full py-2.5 px-4 rounded-2xl font-semibold text-xs sm:text-sm bg-indigo-50/80 hover:bg-indigo-100 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/60 dark:border-indigo-800/60 transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-sm">
+                    <span class="text-base">🔔</span>
+                    <span>Phát 1 tiếng chuông thông báo (Tại máy này)</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Realtime Remote Bell Control Panel (Nhận chuông khi người khác vào link) -->
+        <section class="mt-6 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border-2 border-indigo-500/20 dark:border-indigo-400/20 relative overflow-hidden">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-slate-700/60">
+                <div class="flex items-start space-x-3">
+                    <div class="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/80 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl shrink-0 mt-0.5">
+                        📡
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-bold text-sm sm:text-base text-slate-800 dark:text-slate-100">Chuông báo khách truy cập từ xa (Realtime)</h3>
+                            <span id="realtimeStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-700 dark:bg-amber-950/80 dark:text-amber-300">
+                                <span id="realtimeDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                <span id="realtimeStatusText">Cần bấm kích hoạt loa</span>
+                            </span>
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Khi bất kỳ ai mở Link chia sẻ bên dưới trên điện thoại/máy tính khác, tab web đang mở của bạn sẽ tự động kêu chuông ngay lập tức!
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Nút kích hoạt loa trên máy chủ của bạn -->
+                <button id="armAudioBtn" onclick="enableHostRealtimeAudio()" class="shrink-0 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-500/25 transition transform active:scale-95 flex items-center justify-center gap-2">
+                    <span id="armAudioIcon">🔊</span>
+                    <span id="armAudioText">Bật trực chờ nhận chuông</span>
+                </button>
+            </div>
+
+            <!-- Room / Channel & Link Sharing -->
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div class="sm:col-span-4 bg-slate-50 dark:bg-slate-900/70 px-3.5 py-2 rounded-2xl border border-slate-200/70 dark:border-slate-700/70">
+                    <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-400">Mã kênh kết nối (Room ID)</label>
+                    <div class="flex items-center justify-between mt-0.5">
+                        <input type="text" id="roomIdInput" onchange="updateRoomChannel(this.value)" class="w-full bg-transparent font-mono font-bold text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 focus:outline-none" value="focusflow-vip-888">
+                        <span class="text-[10px] text-slate-400 ml-1">✎</span>
+                    </div>
+                </div>
+
+                <div class="sm:col-span-8 flex flex-wrap sm:flex-nowrap items-center gap-2">
+                    <button onclick="copyShareableRingLink()" class="flex-1 py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/70 text-indigo-600 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/70 transition active:scale-95 flex items-center justify-center gap-2">
+                        <span>🔗</span>
+                        <span>Copy Link tự kêu chuông (?ring=1)</span>
+                    </button>
+                    <button onclick="sendRemoteRingSignal('Bấm thử từ trang web')" class="py-3 px-4 rounded-2xl font-bold text-xs sm:text-sm bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-500/20 transition active:scale-95 flex items-center justify-center gap-1.5" title="Gửi tín hiệu chuông tới mọi máy đang mở cùng mã kênh">
+                        <span>📲</span>
+                        <span>Test bắn tín hiệu</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Hiển thị đường dẫn trực quan -->
+            <div class="mt-3 px-3 py-2 bg-slate-50/80 dark:bg-slate-900/40 rounded-xl border border-dashed border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 text-xs">
+                <span class="text-slate-400 shrink-0 font-medium">Link gửi cho khách:</span>
+                <code id="shareUrlPreview" class="font-mono text-indigo-600 dark:text-indigo-400 truncate select-all">https://.../index.html?ring=1&room=focusflow-vip-888</code>
+            </div>
+
+            <!-- Nhật ký chuông gọi từ xa -->
+            <div class="mt-4 pt-3 border-t border-slate-100 dark:border-slate-700/50">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                        <span>🛎️ Lịch sử tín hiệu chuông gọi tới</span>
+                        <span id="ringCountBadge" class="px-2 py-0.5 text-[10px] rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-600 dark:text-indigo-300 font-extrabold">0</span>
+                    </span>
+                    <button onclick="clearRemoteRingLogs()" class="text-[11px] text-slate-400 hover:text-rose-500 transition">Xóa log</button>
+                </div>
+                <div id="remoteRingLogList" class="space-y-1.5 max-h-28 overflow-y-auto pr-1 text-xs">
+                    <p class="text-slate-400 dark:text-slate-500 italic py-1">Chưa có tín hiệu truy cập nào. Hãy bấm "Test bắn tín hiệu" hoặc mở link trên tab ẩn danh!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- History & Status Section -->
+        <section class="mt-8 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200/60 dark:border-slate-700/60">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2 text-slate-800 dark:text-slate-100">
+                    <span>📊 Nhật ký các phiên hoàn thành</span>
+                </h3>
+                <button onclick="clearHistory()" class="text-xs font-semibold text-rose-500 hover:text-rose-600 hover:underline transition">Xóa lịch sử</button>
+            </div>
+            <div id="historyList" class="space-y-2.5 max-h-52 overflow-y-auto pr-1">
+                <p class="text-slate-400 text-sm text-center py-6">Chưa có phiên làm việc nào được hoàn thành.</p>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer info -->
+    <footer class="text-center py-5 text-xs text-slate-400 dark:text-slate-500">
+        FocusFlow Timer &bull; Pomodoro Web App tích hợp Google Sheet Webhook & Web Audio API
+    </footer>
+
+    <!-- Alarm Ringing Overlay Modal -->
     <div id="alarmModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl border-2 border-rose-500 animate-bounce">
             <div class="w-20 h-20 mx-auto mb-4 bg-rose-100 dark:bg-rose-950/60 text-rose-600 rounded-full flex items-center justify-center text-4xl animate-pulse">
                 🔔
             </div>
             <h2 class="text-2xl font-black text-rose-600 dark:text-rose-400 mb-2">HẾT GIỜ TẬP TRUNG!</h2>
-            <p id="alarmTaskText" class="text-sm font-medium text-slate-600 dark:text-slate-300 mb-6">Bạn đã hoàn thành phiên làm việc.</p>
+            <p id="alarmTaskText" class="text-sm font-medium text-slate-600 dark:text-slate-300 mb-6">Bạn đã hoàn thành phiên làm việc xuất sắc.</p>
             <button onclick="stopAlarm()" class="w-full py-4 px-6 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white text-lg font-bold rounded-2xl shadow-xl shadow-rose-500/40 transition transform active:scale-95 flex items-center justify-center gap-2">
                 <span>🔕</span>
                 <span>TẮT CHUÔNG NGAY</span>
@@ -140,46 +264,26 @@
         </div>
     </div>
 
-    <!-- History & Status Section -->
-    <div class="mt-8 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-xl border border-slate-200/60 dark:border-slate-700/60">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="font-bold text-sm sm:text-base flex items-center space-x-2">
-                    <span>📊 Nhật ký các phiên hoàn thành</span>
-                </h3>
-                <button onclick="clearHistory()" class="text-xs text-rose-500 hover:underline">Xóa lịch sử</button>
-            </div>
-            <div id="historyList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-                <p class="text-slate-400 text-sm text-center py-4">Chưa có phiên làm việc nào được hoàn thành.</p>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- Footer info -->
-    <footer class="text-center py-4 text-xs text-slate-400">
-        Pomodoro Web App tích hợp Google Sheet Webhook & Web Audio API
-    </footer>
-
     <!-- Settings Modal -->
-    <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
         <div class="bg-white dark:bg-slate-800 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 dark:border-slate-700">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-bold">Cài đặt ứng dụng</h3>
-                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold text-xl">&times;</button>
+            <div class="flex justify-between items-center mb-5 pb-3 border-b border-slate-100 dark:border-slate-700">
+                <h3 class="text-lg font-bold text-slate-800 dark:text-slate-100">Cài đặt ứng dụng</h3>
+                <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-white font-bold text-2xl leading-none">&times;</button>
             </div>
             
             <!-- Sound Selection -->
             <div class="mb-5 pb-5 border-b border-slate-100 dark:border-slate-700">
-                <label class="block text-xs font-semibold mb-1.5 text-slate-600 dark:text-slate-300">🔔 Chuông thông báo khi hoàn thành:</label>
+                <label for="soundSelect" class="block text-xs font-semibold mb-2 text-slate-600 dark:text-slate-300">🔔 Âm thanh thông báo:</label>
                 <div class="flex items-center gap-2">
                     <select id="soundSelect" class="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-medium text-slate-700 dark:text-slate-200">
-                        <option value="chime">✨ Chuông trong trẻo (Crystal Chime)</option>
-                        <option value="zen">🧘 Chuông thiền tĩnh tâm (Zen Gong)</option>
-                        <option value="marimba">🎶 Marimba vui tươi (Cheerful Arpeggio)</option>
-                        <option value="arcade">👾 Bíp điện tử Retro 8-bit (Digital Arcade)</option>
-                        <option value="ping">💧 Chuông Ping nhẹ nhàng (Soft Ping)</option>
+                        <option value="dingdong">🔔 Ding-Dong - Hai nốt du dương vừa vặn (0.65s)</option>
+                        <option value="crystal">✨ Crystal Bell - Chuông pha lê ngân nhẹ (0.75s)</option>
+                        <option value="marimba">🎶 Marimba - Gõ phím gỗ ấm áp (0.55s)</option>
+                        <option value="bell">🛎️ Service Bell - Chuông sảnh thanh nhã (0.8s)</option>
+                        <option value="breeze">🍃 Breeze - Âm synth dịu êm lướt qua (0.6s)</option>
                     </select>
-                    <button type="button" onclick="previewSelectedSound()" class="px-3 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0" title="Nghe thử chuông">
+                    <button type="button" onclick="previewSelectedSound()" class="px-3.5 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0" title="Nghe thử chuông">
                         <span>🔊</span>
                         <span>Nghe thử</span>
                     </button>
@@ -187,21 +291,31 @@
             </div>
 
             <!-- Google Sheet Webhook Config -->
-            <div class="mb-4">
-                <label class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">📊 Google Apps Script Webhook URL:</label>
+            <div class="mb-5 pb-5 border-b border-slate-100 dark:border-slate-700">
+                <label for="scriptUrlInput" class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">📊 Google Apps Script Webhook URL (Đồng bộ Sheet):</label>
                 <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
-                    Dán URL Web App đã triển khai từ Google Apps Script (Execute as: <b>Me</b>, Who has access: <b>Anyone</b>) để tự động xuất dữ liệu.
+                    Dán URL Web App đã Deploy từ Google Apps Script (Who has access: <b>Anyone</b>) để tự động xuất dữ liệu.
                 </p>
-                <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-mono">
             </div>
+
+            <!-- Firebase Realtime Database URL (Tùy chọn nâng cao) -->
+            <div class="mb-5">
+                <label for="firebaseUrlInput" class="block text-xs font-semibold mb-1 text-slate-600 dark:text-slate-300">🔥 Firebase Realtime Database URL (Tùy chọn):</label>
+                <p class="text-xs text-slate-500 dark:text-slate-400 mb-2 leading-relaxed">
+                    Mặc định ứng dụng đã <b>hoạt động tức thì</b> qua kênh Realtime SSE miễn phí theo Mã kênh (Room ID). Nếu muốn dùng Firebase riêng, hãy dán URL Database (예: <code>https://ten-project-default-rtdb.firebaseio.com</code>) vào đây:
+                </p>
+                <input type="text" id="firebaseUrlInput" placeholder="https://your-project-default-rtdb.firebaseio.com" class="w-full px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 font-mono">
+            </div>
+
             <div class="flex justify-end space-x-3 mt-6">
-                <button onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-xl hover:bg-slate-200 transition">Hủy</button>
-                <button onclick="saveSettings()" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-xl hover:bg-indigo-700 transition">Lưu cài đặt</button>
+                <button onclick="closeSettingsModal()" class="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-xl hover:bg-slate-200 transition">Hủy</button>
+                <button onclick="saveSettings()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl shadow-md transition">Lưu cài đặt</button>
             </div>
         </div>
     </div>
 
-    <!-- Application Script -->
+    <!-- Application Logic Script -->
     <script>
         // State Variables
         let timerInterval = null;
@@ -210,9 +324,9 @@
         let totalSeconds = 25 * 60;
         let initialSeconds = 25 * 60;
         let isRunning = false;
-        let selectedSoundType = 'chime';
+        let selectedSoundType = 'dingdong';
 
-        const CIRCUMFERENCE = 2 * Math.PI * 95; // r=95 => ~596.9
+        const CIRCUMFERENCE = 2 * Math.PI * 95; // r=95 => ~596.9026
 
         // DOM Elements
         const timerDisplay = document.getElementById('timerDisplay');
@@ -221,34 +335,382 @@
         const startPauseIcon = document.getElementById('startPauseIcon');
         const startPauseText = document.getElementById('startPauseText');
         const progressCircle = document.getElementById('progressCircle');
+        const ringWrapper = document.getElementById('ringWrapper');
         const taskNameInput = document.getElementById('taskNameInput');
         const customMinutesInput = document.getElementById('customMinutesInput');
         const historyList = document.getElementById('historyList');
         const settingsModal = document.getElementById('settingsModal');
         const scriptUrlInput = document.getElementById('scriptUrlInput');
+        const firebaseUrlInput = document.getElementById('firebaseUrlInput');
         const soundSelect = document.getElementById('soundSelect');
         const alarmModal = document.getElementById('alarmModal');
         const alarmTaskText = document.getElementById('alarmTaskText');
+        const themeIcon = document.getElementById('themeIcon');
 
-        // Setup Progress Circle Circumference
+        // Realtime Remote Bell Variables
+        let currentRoomId = 'focusflow-vip-888';
+        let sseConnection = null;
+        let firebaseSseConnection = null;
+        let isAudioUnlocked = false;
+        let ringLogsCount = 0;
+        let lastProcessedSignalId = '';
+        let sharedAudioCtx = null;
+
+        // Circular progress initialization
         progressCircle.style.strokeDasharray = `${CIRCUMFERENCE}`;
         progressCircle.style.strokeDashoffset = '0';
 
         document.addEventListener("DOMContentLoaded", () => {
-            if ("Notification" in window && Notification.permission !== "granted") {
+            // Check system / saved dark mode
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+                themeIcon.innerText = "☀️";
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.innerText = "🌙";
+            }
+
+            // Notification permission request
+            if ("Notification" in window && Notification.permission === "default") {
                 Notification.requestPermission();
             }
+
+            // Load saved settings
             const savedUrl = localStorage.getItem('google_script_url') || '';
             scriptUrlInput.value = savedUrl;
 
-            selectedSoundType = localStorage.getItem('focus_sound_type') || 'chime';
+            const savedFirebaseUrl = localStorage.getItem('firebase_db_url') || '';
+            firebaseUrlInput.value = savedFirebaseUrl;
+
+            selectedSoundType = localStorage.getItem('focus_sound_type') || 'dingdong';
             soundSelect.value = selectedSoundType;
+
+            // Load Room ID from URL (?room=...) or LocalStorage
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomFromUrl = urlParams.get('room');
+            if (roomFromUrl && roomFromUrl.trim() !== '') {
+                currentRoomId = roomFromUrl.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+                localStorage.setItem('focus_room_id', currentRoomId);
+            } else {
+                currentRoomId = localStorage.getItem('focus_room_id') || 'focusflow-vip-888';
+            }
+            document.getElementById('roomIdInput').value = currentRoomId;
+            updateShareUrlPreview();
 
             loadHistory();
             updateDisplay();
+
+            // Khởi tạo lắng nghe tín hiệu Realtime từ xa (Cả kênh SSE mặc định & Firebase nếu có)
+            initRealtimeBellListener();
+
+            // Tự động mở khóa AudioContext ngay khi chủ máy click bất kỳ đâu trên trang
+            const unlockOnAnyClick = () => {
+                if (!isAudioUnlocked) {
+                    enableHostRealtimeAudio(true);
+                }
+            };
+            window.addEventListener('click', unlockOnAnyClick, { once: true });
+            window.addEventListener('touchstart', unlockOnAnyClick, { once: true });
+
+            // URL parameter handling (?autostart=true, ?mins, ?task)
+            const customMins = parseInt(urlParams.get('mins'));
+            if (customMins && customMins > 0) {
+                selectPreset(customMins);
+            }
+            const taskParam = urlParams.get('task');
+            if (taskParam) {
+                taskNameInput.value = decodeURIComponent(taskParam);
+            }
+            if (urlParams.get('autostart') === 'true') {
+                setTimeout(() => {
+                    toggleTimer();
+                }, 300);
+            }
+
+            // KHI NGƯỜI KHÁC TRUY CẬP LINK CÓ ?ring=1 HOẶC ?alert=true:
+            // 1. Gửi tín hiệu Realtime về máy của bạn (Host) để máy bạn phát chuông!
+            // 2. Đồng thời phát chuông trên máy người truy cập
+            if (urlParams.get('ring') === '1' || urlParams.get('alert') === 'true') {
+                const senderLabel = urlParams.get('from') || 'Khách mở link (?ring=1)';
+                // Phát tín hiệu về máy chủ của bạn ngay lập tức
+                sendRemoteRingSignal(senderLabel, true);
+
+                let hasRungLocal = false;
+                const triggerAlertSound = () => {
+                    if (hasRungLocal) return;
+                    hasRungLocal = true;
+                    playSound(selectedSoundType || 'dingdong');
+                    showToast("🔔 Đã gửi chuông!", "Đã báo chuông tới máy chủ & phát âm báo!");
+                };
+
+                try {
+                    triggerAlertSound();
+                } catch (e) {
+                    console.warn("Trình duyệt yêu cầu tương tác:", e);
+                }
+
+                const handleFirstUserInteraction = () => {
+                    triggerAlertSound();
+                    window.removeEventListener('click', handleFirstUserInteraction);
+                    window.removeEventListener('touchstart', handleFirstUserInteraction);
+                    window.removeEventListener('keydown', handleFirstUserInteraction);
+                };
+
+                window.addEventListener('click', handleFirstUserInteraction, { once: true });
+                window.addEventListener('touchstart', handleFirstUserInteraction, { once: true });
+                window.addEventListener('keydown', handleFirstUserInteraction, { once: true });
+            }
         });
 
-        // Preset Button Selection
+        // =========================================================================
+        // HỆ THỐNG CHUÔNG TỪ XA THỜI GIAN THỰC (FIREBASE + ZERO-CONFIG REALTIME SSE)
+        // =========================================================================
+
+        function enableHostRealtimeAudio(silent = false) {
+            try {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!sharedAudioCtx) {
+                    sharedAudioCtx = new AudioContext();
+                }
+                if (sharedAudioCtx.state === 'suspended') {
+                    sharedAudioCtx.resume();
+                }
+                isAudioUnlocked = true;
+
+                // Cập nhật trạng thái UI sang Đang Trực Chờ (Xanh lá)
+                const badge = document.getElementById('realtimeStatusBadge');
+                const dot = document.getElementById('realtimeDot');
+                const text = document.getElementById('realtimeStatusText');
+                const btn = document.getElementById('armAudioBtn');
+                const btnIcon = document.getElementById('armAudioIcon');
+                const btnText = document.getElementById('armAudioText');
+
+                badge.className = "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300";
+                dot.className = "w-2 h-2 rounded-full bg-emerald-500 animate-ping";
+                text.innerText = "Đang trực tuyến chờ chuông";
+
+                btn.className = "shrink-0 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm bg-slate-100 dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 transition flex items-center justify-center gap-2";
+                btnIcon.innerText = "✅";
+                btnText.innerText = "Loa đã sẵn sàng nhận chuông";
+
+                if (!silent) {
+                    playSound(selectedSoundType);
+                    showToast("📡 Đã bật nhận chuông!", "Giờ ai truy cập link ?ring=1 thì máy bạn sẽ kêu chuông ngay.");
+                }
+            } catch (e) {
+                console.warn("Không thể mở khóa AudioContext:", e);
+            }
+        }
+
+        function updateRoomChannel(newRoom) {
+            const cleaned = (newRoom || '').trim().replace(/[^a-zA-Z0-9_-]/g, '') || 'focusflow-vip-888';
+            currentRoomId = cleaned;
+            document.getElementById('roomIdInput').value = currentRoomId;
+            localStorage.setItem('focus_room_id', currentRoomId);
+            updateShareUrlPreview();
+            initRealtimeBellListener();
+            showToast("🔄 Đã đổi mã kênh", `Đang lắng nghe trên kênh: ${currentRoomId}`);
+        }
+
+        function updateShareUrlPreview() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const shareLink = `${baseUrl}?ring=1&room=${encodeURIComponent(currentRoomId)}`;
+            const previewEl = document.getElementById('shareUrlPreview');
+            if (previewEl) {
+                previewEl.innerText = shareLink;
+            }
+        }
+
+        function copyShareableRingLink() {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const shareLink = `${baseUrl}?ring=1&room=${encodeURIComponent(currentRoomId)}`;
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = shareLink;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+
+            enableHostRealtimeAudio(true);
+            showToast("📋 Đã sao chép Link!", "Hãy gửi link này cho người khác. Khi họ mở, máy bạn sẽ kêu chuông!");
+        }
+
+        // Khởi tạo kết nối Realtime (Hỗ trợ cả ntfy SSE miễn phí & Firebase Realtime Database)
+        function initRealtimeBellListener() {
+            // 1. Đóng kết nối cũ nếu có
+            if (sseConnection) {
+                sseConnection.close();
+                sseConnection = null;
+            }
+            if (firebaseSseConnection) {
+                firebaseSseConnection.close();
+                firebaseSseConnection = null;
+            }
+
+            // 2. Kết nối kênh Zero-Config Realtime Stream (ntfy.sh SSE)
+            const topicName = `focusflow_bell_${currentRoomId}`;
+            try {
+                sseConnection = new EventSource(`https://ntfy.sh/${topicName}/sse`);
+                sseConnection.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.event === 'message' && data.message) {
+                            const payload = JSON.parse(data.message);
+                            handleIncomingRemoteRing(payload);
+                        }
+                    } catch (err) {
+                        // Fallback nếu message là plain text
+                    }
+                };
+            } catch (err) {
+                console.warn("SSE connection warning:", err);
+            }
+
+            // 3. Nếu người dùng có cấu hình Firebase Realtime Database URL riêng thì lắng nghe song song
+            const fbUrl = (localStorage.getItem('firebase_db_url') || '').trim().replace(/\/$/, '');
+            if (fbUrl && fbUrl.startsWith('https://')) {
+                try {
+                    const fbEndpoint = `${fbUrl}/focusflow_rooms/${currentRoomId}.json`;
+                    firebaseSseConnection = new EventSource(fbEndpoint);
+                    let isInitialLoad = true;
+
+                    firebaseSseConnection.addEventListener('put', (event) => {
+                        try {
+                            const parsed = JSON.parse(event.data);
+                            if (isInitialLoad) {
+                                isInitialLoad = false;
+                                return; // Bỏ qua dữ liệu cũ lúc mới mở trang
+                            }
+                            if (parsed && parsed.data && parsed.data.id) {
+                                handleIncomingRemoteRing(parsed.data);
+                            }
+                        } catch (e) {}
+                    });
+                } catch (err) {
+                    console.warn("Firebase SSE error:", err);
+                }
+            }
+        }
+
+        // Hàm bắn tín hiệu chuông lên đám mây khi có người mở link ?ring=1 hoặc bấm nút Test
+        function sendRemoteRingSignal(sourceLabel = 'Khách truy cập link', isFromUrlVisit = false) {
+            const signalPayload = {
+                id: 'sig_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7),
+                room: currentRoomId,
+                source: sourceLabel,
+                timestamp: Date.now(),
+                timeText: new Date().toLocaleTimeString('vi-VN')
+            };
+
+            // 1. Gửi qua Zero-Config Realtime Stream (ntfy.sh)
+            const topicName = `focusflow_bell_${currentRoomId}`;
+            fetch(`https://ntfy.sh/${topicName}`, {
+                method: 'POST',
+                body: JSON.stringify(signalPayload)
+            }).catch(err => console.warn("Lỗi gửi tín hiệu SSE:", err));
+
+            // 2. Gửi lên Firebase Realtime Database nếu người dùng có điền URL Firebase
+            const fbUrl = (localStorage.getItem('firebase_db_url') || '').trim().replace(/\/$/, '');
+            if (fbUrl && fbUrl.startsWith('https://')) {
+                const fbEndpoint = `${fbUrl}/focusflow_rooms/${currentRoomId}.json`;
+                fetch(fbEndpoint, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(signalPayload)
+                }).catch(err => console.warn("Lỗi gửi Firebase:", err));
+            }
+
+            if (!isFromUrlVisit) {
+                showToast("📡 Đã phát tín hiệu!", `Đã gửi lệnh kêu chuông tới kênh "${currentRoomId}"`);
+            }
+        }
+
+        // Xử lý khi máy của bạn nhận được tín hiệu chuông từ xa
+        function handleIncomingRemoteRing(payload) {
+            if (!payload || !payload.id) return;
+            // Chống trùng lặp nếu dùng đồng thời cả 2 kênh
+            if (payload.id === lastProcessedSignalId) return;
+            lastProcessedSignalId = payload.id;
+
+            // Chỉ nhận tín hiệu mới trong vòng 15 giây đổ lại
+            if (payload.timestamp && Math.abs(Date.now() - payload.timestamp) > 15000) {
+                return;
+            }
+
+            // Phát tiếng chuông thông báo ngay trên máy bạn!
+            playSound(selectedSoundType);
+
+            // Hiệu ứng nháy viền nổi bật
+            ringWrapper.classList.add('animate-pulse-ring');
+            setTimeout(() => {
+                if (!isRunning) ringWrapper.classList.remove('animate-pulse-ring');
+            }, 2200);
+
+            const sender = payload.source || 'Khách truy cập link';
+            const timeStr = payload.timeText || new Date().toLocaleTimeString('vi-VN');
+
+            showToast("🔔 CHUÔNG TỪ XA!", `${sender} vừa kích hoạt chuông lúc ${timeStr}!`);
+
+            // Gửi cả System Notification nếu tab đang ẩn
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("🔔 Có người vừa mở Link chuông!", {
+                    body: `${sender} lúc ${timeStr} (Kênh: ${currentRoomId})`
+                });
+            }
+
+            // Ghi vào danh sách lịch sử chuông gọi từ xa
+            appendRemoteRingLog(sender, timeStr);
+        }
+
+        function appendRemoteRingLog(sender, timeStr) {
+            const logList = document.getElementById('remoteRingLogList');
+            const badge = document.getElementById('ringCountBadge');
+
+            if (ringLogsCount === 0) {
+                logList.innerHTML = '';
+            }
+            ringLogsCount++;
+            badge.innerText = ringLogsCount;
+
+            const item = document.createElement('div');
+            item.className = "flex justify-between items-center bg-indigo-50/70 dark:bg-indigo-950/40 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-900/50 animate-pulse";
+            setTimeout(() => item.classList.remove('animate-pulse'), 1500);
+
+            item.innerHTML = `
+                <span class="font-semibold text-indigo-700 dark:text-indigo-300 truncate">🔔 ${escapeHtml(sender)}</span>
+                <span class="text-[11px] font-mono text-slate-400 shrink-0 ml-2">${escapeHtml(timeStr)}</span>
+            `;
+            logList.prepend(item);
+        }
+
+        function clearRemoteRingLogs() {
+            ringLogsCount = 0;
+            document.getElementById('ringCountBadge').innerText = '0';
+            document.getElementById('remoteRingLogList').innerHTML = `<p class="text-slate-400 dark:text-slate-500 italic py-1">Đã xóa nhật ký chuông gọi từ xa.</p>`;
+        }
+
+        // Phát 1 tiếng chuông thông báo ngắn gọn khi bấm nút
+        function playSingleNotificationSound() {
+            enableHostRealtimeAudio(true);
+            playSound(selectedSoundType);
+            showToast("🔔 Thông báo", "Đã phát 1 tiếng chuông.");
+        }
+
+        // Theme Toggle
+        function toggleDarkMode() {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+                themeIcon.innerText = "🌙";
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+                themeIcon.innerText = "☀️";
+            }
+        }
+
+        // Preset Duration Selection
         function selectPreset(minutes) {
             minutes = parseInt(minutes);
             if (isNaN(minutes) || minutes <= 0) return;
@@ -258,7 +720,6 @@
             updatePresetHighlight(minutes);
         }
 
-        // Custom Minutes Input Changed
         function onCustomMinutesChange(value) {
             let mins = parseInt(value);
             if (isNaN(mins) || mins < 1) mins = 1;
@@ -283,6 +744,7 @@
             if (isRunning) {
                 clearInterval(timerInterval);
                 isRunning = false;
+                ringWrapper.classList.remove('animate-pulse-ring');
                 updatePlayButtonState();
             }
             activeTaskDurationMinutes = minutes;
@@ -297,10 +759,12 @@
             if (isRunning) {
                 clearInterval(timerInterval);
                 isRunning = false;
+                ringWrapper.classList.remove('animate-pulse-ring');
                 statusLabel.innerText = "Đã tạm dừng";
                 updatePlayButtonState();
             } else {
                 isRunning = true;
+                ringWrapper.classList.add('animate-pulse-ring');
                 statusLabel.innerText = "Đang tập trung";
                 updatePlayButtonState();
                 timerInterval = setInterval(() => {
@@ -310,6 +774,7 @@
                     } else {
                         clearInterval(timerInterval);
                         isRunning = false;
+                        ringWrapper.classList.remove('animate-pulse-ring');
                         statusLabel.innerText = "Hoàn thành";
                         updatePlayButtonState();
                         handleTimerComplete();
@@ -322,6 +787,7 @@
             stopAlarm();
             clearInterval(timerInterval);
             isRunning = false;
+            ringWrapper.classList.remove('animate-pulse-ring');
             statusLabel.innerText = "Sẵn sàng";
             updatePlayButtonState();
             totalSeconds = initialSeconds;
@@ -335,7 +801,7 @@
             timerDisplay.innerText = timeString;
             document.title = `(${timeString}) FocusFlow Timer`;
 
-            // Circular progress calculation
+            // Calculate circle offset
             const progressRatio = totalSeconds / initialSeconds;
             const offset = CIRCUMFERENCE * (1 - progressRatio);
             progressCircle.style.strokeDashoffset = offset;
@@ -345,53 +811,50 @@
             if (isRunning) {
                 startPauseIcon.innerText = "⏸";
                 startPauseText.innerText = "Tạm dừng";
-                startPauseBtn.className = "bg-amber-600 hover:bg-amber-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-amber-500/30 transition transform active:scale-95 flex items-center space-x-2";
+                startPauseBtn.className = "bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold px-8 py-3.5 rounded-2xl shadow-lg shadow-amber-500/30 transition transform active:scale-95 flex items-center space-x-2";
             } else {
                 startPauseIcon.innerText = "▶";
                 startPauseText.innerText = "Bắt đầu";
-                startPauseBtn.className = "bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2";
+                startPauseBtn.className = "bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold px-8 py-3.5 rounded-2xl shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center space-x-2";
             }
         }
 
         // Timer Completion Event
         function handleTimerComplete() {
-            const taskName = taskNameInput.value.trim() || "Phiên tập trung";
+            const taskName = taskNameInput.value.trim() || "Phiên tập trung tự do";
             
-            // Notification API
+            // Native Browser Notification
             if ("Notification" in window && Notification.permission === "granted") {
-                new Notification("Hết giờ!", {
+                new Notification("🎉 Hết giờ tập trung!", {
                     body: `Bạn đã hoàn thành: ${taskName} (${activeTaskDurationMinutes} phút)`,
-                    icon: "https://cdn-icons-png.flaticon.com/512/2921/2921222.png",
+                    icon: "https://placehold.co/128x128/6366f1/ffffff?text=Focus",
                     requireInteraction: true
                 });
             }
 
-            showToast("🎉 Hoàn thành!", `Đã kết thúc phiên: ${taskName} (${activeTaskDurationMinutes} phút)`);
+            showToast("🎉 Hoàn thành xuất sắc!", `Phiên: ${taskName} (${activeTaskDurationMinutes} phút)`);
             saveHistoryEntry(taskName, activeTaskDurationMinutes);
 
+            // Sync to Google Sheet if configured
             const scriptUrl = localStorage.getItem('google_script_url');
             if (scriptUrl) {
                 syncToGoogleSheet(scriptUrl, taskName, activeTaskDurationMinutes);
             }
 
-            // Kích hoạt chuông liên tục và hiển thị màn hình tắt chuông
+            // Start continuous alarm
             startContinuousAlarm(taskName);
         }
 
-        // Continuous Alarm Loop
+        // Alarm Loop & Overlay Control
         function startContinuousAlarm(taskName) {
-            stopAlarm(); // Đảm bảo không bị lặp đè
+            stopAlarm();
             alarmTaskText.innerText = `Đã hoàn thành: "${taskName}" (${activeTaskDurationMinutes} phút)`;
             alarmModal.classList.remove('hidden');
 
-            // Phát ngay lần đầu tiên
             playSound(selectedSoundType);
-
-            // Xác định chu kỳ lặp lại tùy theo loại chuông
-            const loopDelay = selectedSoundType === 'zen' ? 3500 : 2000;
             alarmInterval = setInterval(() => {
                 playSound(selectedSoundType);
-            }, loopDelay);
+            }, 1800);
         }
 
         function stopAlarm() {
@@ -402,130 +865,153 @@
             alarmModal.classList.add('hidden');
         }
 
-        // Web Audio API Sound Synthesizers
+        // Web Audio API Synthesizers: Balanced duration notification sounds (~0.5s - 0.8s)
         function playSound(type) {
             try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (!sharedAudioCtx) {
+                    sharedAudioCtx = new AudioContext();
+                }
+                const audioCtx = sharedAudioCtx;
                 if (audioCtx.state === 'suspended') {
                     audioCtx.resume();
                 }
 
                 const now = audioCtx.currentTime;
 
-                if (type === 'zen') {
-                    // Deep Zen Singing Bowl / Gong sound
-                    const osc = audioCtx.createOscillator();
-                    const subOsc = audioCtx.createOscillator();
-                    const gain = audioCtx.createGain();
+                if (type === 'crystal') {
+                    // Crystal Bell (~0.75s) - Harmonic bell with sweet resonance
+                    const freqs = [1046.50, 2093.00, 3135.96]; // C6, C7, G7 overtone
+                    const gains = [0.35, 0.15, 0.08];
 
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(216, now); // 216Hz A
-                    subOsc.type = 'sine';
-                    subOsc.frequency.setValueAtTime(432, now); // Harmonic
+                    freqs.forEach((freq, idx) => {
+                        const osc = audioCtx.createOscillator();
+                        const gain = audioCtx.createGain();
+                        osc.type = 'sine';
+                        osc.frequency.setValueAtTime(freq, now);
 
-                    gain.gain.setValueAtTime(0.5, now);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.2);
+                        gain.gain.setValueAtTime(gains[idx], now);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);
 
-                    osc.connect(gain);
-                    subOsc.connect(gain);
-                    gain.connect(audioCtx.destination);
+                        osc.connect(gain);
+                        gain.connect(audioCtx.destination);
 
-                    osc.start(now);
-                    subOsc.start(now);
-                    osc.stop(now + 3.2);
-                    subOsc.stop(now + 3.2);
+                        osc.start(now);
+                        osc.stop(now + 0.75);
+                    });
 
                 } else if (type === 'marimba') {
-                    // Cheerful fast arpeggio
-                    const freqs = [392.00, 523.25, 659.25, 783.99, 1046.50]; // G4, C5, E5, G5, C6
-                    freqs.forEach((freq, idx) => {
-                        const noteStart = now + idx * 0.12;
+                    // Marimba chime (~0.55s) - Two warm, rounded notes (C5 -> G5)
+                    const notes = [
+                        { freq: 523.25, time: 0.0, dur: 0.4 },
+                        { freq: 783.99, time: 0.12, dur: 0.43 }
+                    ];
+
+                    notes.forEach(note => {
+                        const noteStart = now + note.time;
                         const osc = audioCtx.createOscillator();
                         const gain = audioCtx.createGain();
+
                         osc.type = 'triangle';
-                        osc.frequency.setValueAtTime(freq, noteStart);
+                        osc.frequency.setValueAtTime(note.freq, noteStart);
 
-                        gain.gain.setValueAtTime(0.35, noteStart);
-                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.45);
-
-                        osc.connect(gain);
-                        gain.connect(audioCtx.destination);
-
-                        osc.start(noteStart);
-                        osc.stop(noteStart + 0.45);
-                    });
-
-                } else if (type === 'arcade') {
-                    // 8-bit digital arcade victory fan-fare
-                    const notes = [440, 554.37, 659.25, 880];
-                    notes.forEach((freq, idx) => {
-                        const noteStart = now + idx * 0.08;
-                        const osc = audioCtx.createOscillator();
-                        const gain = audioCtx.createGain();
-                        osc.type = 'square';
-                        osc.frequency.setValueAtTime(freq, noteStart);
-
-                        gain.gain.setValueAtTime(0.2, noteStart);
-                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 0.12);
+                        gain.gain.setValueAtTime(0.38, noteStart);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + note.dur);
 
                         osc.connect(gain);
                         gain.connect(audioCtx.destination);
 
                         osc.start(noteStart);
-                        osc.stop(noteStart + 0.12);
+                        osc.stop(noteStart + note.dur);
                     });
 
-                } else if (type === 'ping') {
-                    // Single gentle high soft ping
+                } else if (type === 'bell') {
+                    // Service Desk Bell (~0.8s) - Metallic ping with realistic decay
+                    const osc = audioCtx.createOscillator();
+                    const overtone = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    const gainOver = audioCtx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(1480, now); // F#6
+                    overtone.type = 'sine';
+                    overtone.frequency.setValueAtTime(2960, now);
+
+                    gain.gain.setValueAtTime(0.4, now);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.8);
+
+                    gainOver.gain.setValueAtTime(0.12, now);
+                    gainOver.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
+
+                    osc.connect(gain);
+                    overtone.connect(gainOver);
+                    gain.connect(audioCtx.destination);
+                    gainOver.connect(audioCtx.destination);
+
+                    osc.start(now);
+                    overtone.start(now);
+                    osc.stop(now + 0.8);
+                    overtone.stop(now + 0.45);
+
+                } else if (type === 'breeze') {
+                    // Soft Swell Synth (~0.6s) - Smooth fade-in and natural fade-out
                     const osc = audioCtx.createOscillator();
                     const gain = audioCtx.createGain();
+
                     osc.type = 'sine';
-                    osc.frequency.setValueAtTime(1318.51, now); // E6
-                    gain.gain.setValueAtTime(0.3, now);
-                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.2);
+                    osc.frequency.setValueAtTime(659.25, now); // E5
+                    osc.frequency.exponentialRampToValueAtTime(880.00, now + 0.2); // A5
+
+                    gain.gain.setValueAtTime(0.001, now);
+                    gain.gain.linearRampToValueAtTime(0.35, now + 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
 
                     osc.connect(gain);
                     gain.connect(audioCtx.destination);
 
                     osc.start(now);
-                    osc.stop(now + 1.2);
+                    osc.stop(now + 0.6);
 
                 } else {
-                    // Default: Crystal Chime
-                    const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
-                    notes.forEach((freq, index) => {
-                        const noteStart = now + index * 0.18;
+                    // Default: Elegant Two-Tone Ding-Dong (~0.65s, E5 -> B5)
+                    const notes = [
+                        { freq: 659.25, time: 0.0, dur: 0.35, vol: 0.32 }, // Ding
+                        { freq: 987.77, time: 0.13, dur: 0.52, vol: 0.36 }  // Dong
+                    ];
+
+                    notes.forEach(note => {
+                        const noteStart = now + note.time;
                         const osc = audioCtx.createOscillator();
                         const gain = audioCtx.createGain();
 
                         osc.type = 'sine';
-                        osc.frequency.setValueAtTime(freq, noteStart);
+                        osc.frequency.setValueAtTime(note.freq, noteStart);
 
-                        gain.gain.setValueAtTime(0.3, noteStart);
-                        gain.gain.exponentialRampToValueAtTime(0.001, noteStart + 1.2);
+                        gain.gain.setValueAtTime(note.vol, noteStart);
+                        gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + note.dur);
 
                         osc.connect(gain);
                         gain.connect(audioCtx.destination);
 
                         osc.start(noteStart);
-                        osc.stop(noteStart + 1.2);
+                        osc.stop(noteStart + note.dur);
                     });
                 }
-            } catch (e) {
-                console.log("Audio Context error or not permitted:", e);
+            } catch (err) {
+                console.warn("Audio playback not allowed or failed:", err);
             }
         }
 
         function previewSelectedSound() {
-            const currentSound = soundSelect.value;
-            playSound(currentSound);
+            playSound(soundSelect.value);
         }
 
-        // Webhook to Google Sheet
+        // Google Sheet Webhook Integration
         function syncToGoogleSheet(url, task, duration) {
             const payload = {
                 task: task,
-                duration: duration
+                duration: duration,
+                completedAt: new Date().toISOString()
             };
 
             fetch(url, {
@@ -536,23 +1022,34 @@
                 },
                 body: JSON.stringify(payload)
             }).then(() => {
-                showToast("☁️ Đã đồng bộ", "Dữ liệu phiên làm việc đã được lưu vào Google Sheet!");
+                showToast("☁️ Đã đồng bộ", "Dữ liệu phiên làm việc đã được chuyển tới Google Sheet!");
             }).catch(error => {
-                console.error("Lỗi đồng bộ:", error);
+                console.error("Lỗi đồng bộ webhook:", error);
                 showToast("⚠️ Lỗi đồng bộ", "Không thể gửi dữ liệu tới Google Sheet Webhook.");
             });
         }
 
-        // LocalStorage History
+        // LocalStorage History Management
         function saveHistoryEntry(task, duration) {
             const history = JSON.parse(localStorage.getItem('focus_history') || '[]');
+            const now = new Date();
+            const timeFormatted = now.toLocaleDateString('vi-VN', { 
+                day: '2-digit', 
+                month: '2-digit', 
+                year: 'numeric' 
+            }) + ' ' + now.toLocaleTimeString('vi-VN', { 
+                hour: '2-digit', 
+                minute: '2-digit' 
+            });
+
             const newEntry = {
                 task: task,
                 duration: duration,
-                time: new Date().toLocaleString('vi-VN')
+                time: timeFormatted
             };
+
             history.unshift(newEntry);
-            if (history.length > 30) history.pop();
+            if (history.length > 50) history.pop();
             localStorage.setItem('focus_history', JSON.stringify(history));
             loadHistory();
         }
@@ -560,17 +1057,17 @@
         function loadHistory() {
             const history = JSON.parse(localStorage.getItem('focus_history') || '[]');
             if (history.length === 0) {
-                historyList.innerHTML = `<p class="text-slate-400 text-sm text-center py-4">Chưa có phiên làm việc nào được hoàn thành.</p>`;
+                historyList.innerHTML = `<p class="text-slate-400 text-sm text-center py-6">Chưa có phiên làm việc nào được hoàn thành.</p>`;
                 return;
             }
 
             historyList.innerHTML = history.map(item => `
-                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 text-sm">
-                    <div>
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">${escapeHtml(item.task)}</span>
-                        <span class="block text-xs text-slate-400">${item.time}</span>
+                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 text-sm hover:border-indigo-200 dark:hover:border-indigo-900/50 transition">
+                    <div class="truncate mr-3">
+                        <span class="font-semibold text-slate-700 dark:text-slate-200 block truncate">${escapeHtml(item.task)}</span>
+                        <span class="text-xs text-slate-400 dark:text-slate-500">${item.time}</span>
                     </div>
-                    <span class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold">${item.duration} phút</span>
+                    <span class="shrink-0 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold border border-indigo-200/50 dark:border-indigo-800/40">${item.duration} phút</span>
                 </div>
             `).join('');
         }
@@ -578,7 +1075,7 @@
         function clearHistory() {
             localStorage.removeItem('focus_history');
             loadHistory();
-            showToast("🗑️ Đã xóa", "Lịch sử đã được làm sạch.");
+            showToast("🗑️ Đã làm sạch", "Toàn bộ lịch sử phiên tập trung đã được xóa.");
         }
 
         // Settings Modal
@@ -593,16 +1090,19 @@
 
         function saveSettings() {
             const url = scriptUrlInput.value.trim();
+            const fbUrl = firebaseUrlInput.value.trim();
             selectedSoundType = soundSelect.value;
 
             localStorage.setItem('google_script_url', url);
+            localStorage.setItem('firebase_db_url', fbUrl);
             localStorage.setItem('focus_sound_type', selectedSoundType);
 
+            initRealtimeBellListener();
             closeSettingsModal();
-            showToast("💾 Đã lưu", "Cài đặt chuông và kết nối Sheet đã được cập nhật.");
+            showToast("💾 Đã lưu cấu hình", "Cài đặt âm thanh, Firebase và Webhook đã sẵn sàng.");
         }
 
-        // Toast Helper
+        // Toast Message Notification Helper
         function showToast(title, desc) {
             document.getElementById('toastTitle').innerText = title;
             document.getElementById('toastDesc').innerText = desc;
