@@ -64,6 +64,10 @@
                 </div>
             </div>
             <div class="flex items-center space-x-2">
+                <button onclick="testGoogleSheetSync()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 transition flex items-center gap-1.5" title="Bắn thử 25 phút lên Google Sheet">
+                    <span>📊</span>
+                    <span class="hidden sm:inline">Test ghi Sheet</span>
+                </button>
                 <button onclick="testTelegramAlert()" class="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition flex items-center gap-1.5" title="Test Telegram Bot">
                     <span>✈️</span>
                     <span class="hidden sm:inline">Test Telegram</span>
@@ -459,7 +463,7 @@
             fetch(scriptUrl, {
                 method: "POST",
                 mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify(payload)
             }).then(() => {
                 console.log(`☁️ Đã đặt hẹn giờ Cloud cho [${timerId}] sau ${secondsLeft}s.`);
@@ -478,7 +482,7 @@
             fetch(scriptUrl, {
                 method: "POST",
                 mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify(payload)
             }).catch(() => {});
         }
@@ -1373,25 +1377,37 @@
             fetch(url, {
                 method: "POST",
                 mode: "no-cors",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "text/plain;charset=utf-8" },
                 body: JSON.stringify(payload)
             }).then(() => {
-                showToast("☁️ Đã đồng bộ", "Dữ liệu phiên làm việc đã được lưu vào Google Sheet!");
+                showToast("☁️ Đã đồng bộ", `Đã gửi ${duration} phút lên cột hôm nay trong Google Sheet!`);
             }).catch(error => {
                 console.error("Lỗi đồng bộ:", error);
+                showToast("❌ Lỗi ghi Sheet", "Không thể kết nối tới Webhook URL.");
             });
+        }
+
+        function testGoogleSheetSync() {
+            const scriptUrl = scriptUrlInput.value.trim() || localStorage.getItem('google_script_url');
+            if (!scriptUrl) {
+                showToast("⚠️ Chưa có URL!", "Bấm vào nút ⚙️ Cài đặt và dán link Google Apps Script Webhook URL vào trước nhé!");
+                openSettingsModal();
+                return;
+            }
+            showToast("⏳ Đang gửi lên Sheet...", "Đang ghi thử phiên 25 phút vào Google Sheet...");
+            syncToGoogleSheet(scriptUrl, "Work", 25);
         }
 
         // LocalStorage History
         function saveHistoryEntry(task, duration) {
             const history = JSON.parse(localStorage.getItem('focus_history') || '[]');
-            const newEntry = {
+            const entry = {
                 task: task,
                 duration: duration,
-                time: new Date().toLocaleString('vi-VN')
+                time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString('vi-VN')
             };
-            history.unshift(newEntry);
-            if (history.length > 30) history.pop();
+            history.unshift(entry);
+            if (history.length > 50) history.pop();
             localStorage.setItem('focus_history', JSON.stringify(history));
             loadHistory();
         }
@@ -1407,31 +1423,38 @@
             }
 
             historyList.innerHTML = history.map((item, idx) => `
-                <div class="flex justify-between items-center bg-slate-50 dark:bg-slate-900/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-700/50 text-sm">
-                    <div>
-                        <span class="font-semibold text-slate-700 dark:text-slate-200">${idx + 1}. ${escapeHtml(item.task)}</span>
-                        <span class="block text-xs text-slate-400">${item.time}</span>
+                <div class="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-900/60 rounded-2xl border border-slate-100 dark:border-slate-700/60 text-xs sm:text-sm">
+                    <div class="flex items-center space-x-2.5 truncate pr-2">
+                        <span class="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-bold text-xs flex items-center justify-center shrink-0">${idx + 1}</span>
+                        <span class="font-semibold text-slate-700 dark:text-slate-200 truncate">${escapeHtml(item.task)}</span>
                     </div>
-                    <span class="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-xl text-xs font-bold">${item.duration} phút</span>
+                    <div class="flex items-center space-x-3 shrink-0">
+                        <span class="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-950/70 text-emerald-600 dark:text-emerald-400 font-bold rounded-lg text-xs">${item.duration} phút</span>
+                        <span class="text-slate-400 text-xs">${item.time}</span>
+                    </div>
                 </div>
             `).join('');
         }
 
         function quickAddSession() {
             const box = document.getElementById('quickAddBox');
-            box.classList.toggle('hidden');
+            if (box) box.classList.toggle('hidden');
         }
 
         function submitManualSession() {
             const taskInput = document.getElementById('manualTaskInput');
             const minsInput = document.getElementById('manualMinsInput');
-            const task = taskInput.value.trim() || taskNameInput.value.trim() || "Phiên tập trung";
+            const task = taskInput.value.trim() || taskNameInput.value.trim() || "Work";
             const mins = parseInt(minsInput.value) || 25;
 
             saveHistoryEntry(task, mins);
-            taskInput.value = '';
+            const scriptUrl = scriptUrlInput.value.trim() || localStorage.getItem('google_script_url');
+            if (scriptUrl) {
+                syncToGoogleSheet(scriptUrl, task, mins);
+            }
+            taskInput.value = 'Work';
             document.getElementById('quickAddBox').classList.add('hidden');
-            showToast("✅ Đã thêm phiên!", `Đã bổ sung "${task}" (${mins} phút) vào nhật ký.`);
+            showToast("✅ Đã thêm phiên!", `Đã bổ sung "${task}" (${mins} phút) vào nhật ký${scriptUrl ? ' & Google Sheet' : ''}.`);
         }
 
         function clearHistory() {
